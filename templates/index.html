@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LexLabor AI - Secure Workplace Rights Advocate</title>
+    <!-- Tailwind CSS: utility classes like "bg-slate-950" or "rounded-xl" below, loaded from a CDN so there's no build step -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js: a tiny framework that lets us add interactivity (x-data, x-show, @click, etc.)
+         directly in HTML attributes, without writing separate JavaScript files -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<!--
+    Everything below is one single-page app. Alpine's x-data="{ ... }" on <body>
+    defines all of the page's state (variables) and functions in one place;
+    every x-model, x-show, x-text, and @click elsewhere in this file reads or
+    changes that same shared state.
+-->
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-cyan-500 selection:text-slate-950"
+      x-data="{
+          panicMode: false,       // true = show the fake spreadsheet overlay instead of the app
+          activeTab: 'audit',     // which sidebar tab is currently visible
+          loading: false,        // true while we're waiting on an API call
+          loadingMessage: 'Anonymizing data and auditing legal statutes...',
+
+          // Form inputs (bound to <input>/<textarea>/<select> via x-model)
+          employmentStatus: 'Full-time Corporate Employee',
+          narrative: '',
+          targetPathway: 'Internal Corporate HR Department',
+          policyText: '',
+          availableDocs: [],
+
+          // Checklist choices
+          allDocs: ['Signed Contract', 'Written Emails', 'Slack/Teams Screenshots', 'Performance Reviews', 'HR Messages', 'Witness Statements', 'Pay Stubs/Bank Records'],
+
+          // API Results - filled in after each backend call succeeds
+          auditResult: null,
+          escalateResult: null,
+          deobfuscateResult: null,
+          timelineResult: null,
+
+          // UI state
+          expandedNode: 1,
+
+          // Adds/removes a document from the available-evidence checklist
+          toggleDoc(doc) {
+              if (this.availableDocs.includes(doc)) {
+                  this.availableDocs = this.availableDocs.filter(d => d !== doc);
+              } else {
+                  this.availableDocs.push(doc);
+              }
+          },
+
+          // Percentage of the evidence checklist that's been checked off
+          get caseStrengthIndex() {
+              if (this.allDocs.length === 0) return 0;
+              return Math.round((this.availableDocs.length / this.allDocs.length) * 100);
+          },
+
+          // Shared helper used by every Execute button: POSTs `payload` to
+          // `endpoint`, then stores the JSON response under `resultKey`
+          // (e.g. resultKey = 'auditResult' fills in this.auditResult).
+          async triggerAction(endpoint, payload, resultKey) {
+              this.loading = true;
+              try {
+                  const response = await fetch(endpoint, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload)
+                  });
+                  if (!response.ok) throw new Error('API Execution Error Context');
+                  this[resultKey] = await response.json();
+              } catch (err) {
+                  alert('Error processing legal request: ' + err.message);
+              } finally {
+                  this.loading = false;
+              }
+          }
+      }"
+      @keydown.escape.window="panicMode = !panicMode">
+
+    <!--
+        PANIC MODE: pressing Escape flips `panicMode` and this fake spreadsheet
+        covers the whole screen, hiding the real app instantly (e.g. if a
+        manager walks by). Pressing the "Resume Work" button flips it back.
+    -->
+    <div x-show="panicMode" x-cloak class="fixed inset-0 bg-white text-black z-50 overflow-auto font-mono p-4">
+        <div class="flex items-center justify-between border-b border-gray-300 pb-2 mb-4 text-xs select-none">
+            <div class="flex items-center space-x-4">
+                <span class="font-bold text-green-700">Microsoft Excel - Corporate_Q3_Financial_Forecast.xlsx</span>
+                <span class="text-gray-500">File  Edit  View  Insert  Format  Data  Tools</span>
+            </div>
+            <button @click="panicMode = false" class="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded text-black font-sans">Resume Work</button>
+        </div>
+        <table class="w-full border-collapse border border-gray-300 text-xs text-left">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="border border-gray-300 p-1 w-10 text-center bg-gray-200"></th>
+                    <th class="border border-gray-300 p-1 bg-gray-200">A</th>
+                    <th class="border border-gray-300 p-1 bg-gray-200">B</th>
+                    <th class="border border-gray-300 p-1 bg-gray-200">C</th>
+                    <th class="border border-gray-300 p-1 bg-gray-200">D</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="row in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]">
+                    <tr>
+                        <td class="border border-gray-300 p-1 bg-gray-100 text-center font-bold text-gray-500" x-text="row"></td>
+                        <td class="border border-gray-300 p-1" x-text="'Q' + Math.ceil(row/5) + '_Operating_Cost'"></td>
+                        <td class="border border-gray-300 p-1 text-right text-green-700" x-text="'$' + (row * 14250 + 32000).toLocaleString()"></td>
+                        <td class="border border-gray-300 p-1 text-right" x-text="(row * 1.45).toFixed(2) + '%'"></td>
+                        <td class="border border-gray-300 p-1 text-gray-400">Stable allocation operational parameters</td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MAIN DASHBOARD WRAPPER -->
+    <div x-show="!panicMode" class="flex flex-col min-h-screen">
+        
+        <!-- HEADER INTERFACE -->
+        <header class="border-b border-slate-800 bg-slate-900/60 sticky top-0 z-40 backdrop-blur-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="h-9 w-9 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center font-bold text-slate-950 tracking-tighter text-lg">
+                        L
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">LexLabor AI</h1>
+                        <p class="text-[10px] text-slate-500 tracking-widest uppercase font-mono">Secure Legal Strategy Terminal</p>
+                    </div>
+                </div>
+                
+                <!-- STEALTH SHIELD ACTIVATOR -->
+                <div class="flex items-center space-x-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        Zero-Retention Data Link
+                    </span>
+                    <button @click="panicMode = true" class="bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 px-3 py-1.5 rounded-md text-xs font-mono text-red-400 transition flex items-center space-x-2 shadow-sm">
+                        <span class="font-bold border border-red-500/30 px-1 py-0.5 rounded bg-red-950 text-[10px]">ESC</span>
+                        <span>Panic Shield</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- APP CONTENT LAYOUT -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
+            
+            <!-- LEFT NAVIGATION CONTROL PANEL -->
+            <section class="w-full lg:w-64 shrink-0 flex flex-col space-y-2">
+                <p class="text-[11px] font-mono uppercase tracking-wider text-slate-500 px-3">Application Modes</p>
+                <button @click="activeTab = 'audit'" :class="activeTab === 'audit' ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-white/5 border-transparent text-slate-400'" class="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium border rounded-lg transition text-left">
+                    <span>🔍</span> <span>Incident Auditor</span>
+                </button>
+                <button @click="activeTab = 'escalate'" :class="activeTab === 'escalate' ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-white/5 border-transparent text-slate-400'" class="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium border rounded-lg transition text-left">
+                    <span>⚖️</span> <span>Escalation Architect</span>
+                </button>
+                
+                <p class="text-[11px] font-mono uppercase tracking-wider text-slate-500 pt-4 px-3">Strategic Features</p>
+                <button @click="activeTab = 'deobfuscate'" :class="activeTab === 'deobfuscate' ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-white/5 border-transparent text-slate-400'" class="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium border rounded-lg transition text-left">
+                    <span>📄</span> <span>Policy De-Obfuscator</span>
+                </button>
+                <button @click="activeTab = 'timeline'" :class="activeTab === 'timeline' ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'hover:bg-white/5 border-transparent text-slate-400'" class="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium border rounded-lg transition text-left">
+                    <span>⏳</span> <span>Timeline Generator</span>
+                </button>
+            </section>
+
+            <!-- CENTRAL WORKSPACE LAYER -->
+            <section class="flex-1 min-w-0">
+                
+                <!-- GLOBAL PULSING SKELETON LOADER -->
+                <div x-show="loading" x-cloak class="glass-panel rounded-xl p-8 text-center flex flex-col items-center justify-center min-h-[300px] space-y-4">
+                    <div class="relative w-16 h-16">
+                        <div class="absolute inset-0 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin"></div>
+                    </div>
+                    <p class="text-sm font-mono text-cyan-400 tracking-wide animate-pulse" x-text="loadingMessage"></p>
+                </div>
+
+                <!-- CONTROLLER DATA CONTAINER VIEWS -->
+                <div x-show="!loading" class="space-y-6">
+                    
+                    <!-- TAB 1: INCIDENT AUDITOR -->
+                    <div x-show="activeTab === 'audit'" class="space-y-6">
+                        <div class="glass-panel rounded-xl p-6">
+                            <h2 class="text-lg font-medium text-white mb-2">Incident Auditor & Rights Classifier</h2>
+                            <p class="text-sm text-slate-400 mb-4">Anonymously submit your raw description to extract regulatory metrics and filing guidelines.</p>
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">Employment Classification</label>
+                                    <select x-model="employmentStatus" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500">
+                                        <option>Full-time Corporate Employee</option>
+                                        <option>Contract / Freelance Worker</option>
+                                        <option>Part-time / Gig Economy Worker</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">Raw Narrative Description</label>
+                                    <textarea x-model="narrative" rows="5" placeholder="Explain what occurred in your own words (e.g. shifts cut after filing reporting notices, payroll processing omissions, hostile commentary)..." class="w-full bg-slate-900/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 resize-none"></textarea>
+                                </div>
+                                <button @click="loadingMessage = 'Auditing labor framework statutes...'; triggerAction('/api/audit', { employment_status: employmentStatus, narrative: narrative }, 'auditResult')" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-slate-950 text-sm font-semibold py-2.5 rounded-lg transition shadow-md">
+                                    Execute Strategic Incident Audit
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- AUDIT RESPONSE DATA OUTPUT -->
+                        <div x-show="auditResult" x-cloak class="glass-panel rounded-xl p-6 border-l-4 border-l-cyan-500 space-y-6">
+                            <h3 class="text-base font-medium text-white border-b border-slate-800 pb-2">Analysis Results</h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
+                                    <span class="block text-[10px] font-mono text-slate-500 uppercase">Computed Severity</span>
+                                    <span class="text-lg font-bold uppercase tracking-wide" 
+                                          :class="{
+                                              'text-emerald-400': auditResult?.severity === 'Low',
+                                              'text-yellow-400': auditResult?.severity === 'Medium',
+                                              'text-orange-400': auditResult?.severity === 'High',
+                                              'text-red-400': auditResult?.severity === 'Critical'
+                                          }" x-text="auditResult?.severity"></span>
+                                </div>
+                                <div class="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
+                                    <span class="block text-[10px] font-mono text-slate-500 uppercase">Statutory Deadlines Warning</span>
+                                    <p class="text-xs text-slate-300 mt-1" x-text="auditResult?.statutory_deadlines"></p>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-900/40 p-4 rounded-lg border border-slate-800/80">
+                                <span class="block text-[10px] font-mono text-slate-500 uppercase mb-2">Identified Violations Matrix</span>
+                                <div class="space-y-3">
+                                    <template x-for="item in auditResult?.violations">
+                                        <div class="border-b border-slate-800/60 last:border-none pb-2 last:pb-0">
+                                            <h4 class="text-sm font-semibold text-cyan-400" x-text="item.title"></h4>
+                                            <p class="text-xs text-slate-400 mt-0.5" x-text="item.explanation"></p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: ESCALATION ARCHITECT -->
+                    <div x-show="activeTab === 'escalate'" class="space-y-6">
+                        <div class="glass-panel rounded-xl p-6 space-y-4">
+                            <div>
+                                <h2 class="text-lg font-medium text-white">Escalation Architect & Evidence Builder</h2>
+                                <p class="text-sm text-slate-400">Map a clear narrative pipeline directly to target organizational endpoints and regulatory bureaus.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">Target Escalation Channel</label>
+                                <select x-model="targetPathway" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-cyan-500">
+                                    <option>Internal Corporate HR Department</option>
+                                    <option>State Department of Labor Bureau</option>
+                                    <option>Retained Private Legal Counsel</option>
+                                </select>
+                            </div>
+
+                            <!-- INTERACTIVE EVIDENCE DYNAMIC TOGGLES -->
+                            <div>
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="text-xs font-mono uppercase tracking-wider text-slate-400">Available Documentation Vault</label>
+                                    <span class="text-xs font-mono text-cyan-400">Case Strength Index: <span x-text="caseStrengthIndex + '%'"></span></span>
+                                </div>
+                                <div class="w-full bg-slate-900 rounded-full h-1.5 mb-4 overflow-hidden border border-slate-800">
+                                    <div class="bg-gradient-to-r from-cyan-500 to-blue-500 h-1.5 rounded-full transition-all duration-500" :style="'width: ' + caseStrengthIndex + '%'"></div>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="doc in allDocs">
+                                        <button @click="toggleDoc(doc)" 
+                                                :class="availableDocs.includes(doc) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/40 shadow-sm' : 'bg-slate-900/40 text-slate-400 border-slate-800 hover:border-slate-700'"
+                                                class="px-3 py-1 rounded-full text-xs border font-medium transition flex items-center space-x-1">
+                                            <span x-text="availableDocs.includes(doc) ? '✓' : '📂'"></span>
+                                            <span x-text="doc"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- FIXED: Changed Python's .strip to JavaScript's native .trim() -->
+                            <button @click="loadingMessage = 'Assembling structured grievance drafts...'; triggerAction('/api/escalate', { target_pathway: targetPathway, available_docs: availableDocs, narrative: narrative }, 'escalateResult')" 
+                                    :disabled="!narrative.trim()"
+                                    class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-slate-950 text-sm font-semibold py-2.5 rounded-lg transition shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
+                                Construct Escalation Pathway
+                            </button>
+                            <p x-show="!narrative.trim()" class="text-[11px] text-amber-400/80 font-mono text-center mt-1">
+                                * Please type an incident narrative in the "Incident Auditor" tab first to provide context for the generator.
+                            </p>
+                        </div>
+
+                        <!-- ESCALATION ARCHITECT RESPONSIVE LADDER & CONTENT -->
+                        <div x-show="escalateResult" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            
+                            <!-- VISUAL LADDER FLOWCHART -->
+                            <div class="glass-panel rounded-xl p-4 h-fit space-y-4">
+                                <span class="block text-[10px] font-mono text-slate-500 uppercase tracking-wider">Visual Escalation Ladder</span>
+                                <div class="relative pl-6 space-y-6 before:absolute before:bottom-2 before:top-2 before:left-2 before:w-0.5 before:bg-slate-800">
+                                    
+                                    <!-- STEP 1 -->
+                                    <div class="relative cursor-pointer" @click="expandedNode = 1">
+                                        <div :class="expandedNode === 1 ? 'bg-cyan-500 border-cyan-400 ring-4 ring-cyan-950' : 'bg-slate-900 border-slate-700'" class="absolute -left-6 w-4 h-4 rounded-full border transition"></div>
+                                        <h4 class="text-xs font-semibold" :class="expandedNode === 1 ? 'text-cyan-400' : 'text-slate-400'">Step 1: Document Internally</h4>
+                                    </div>
+
+                                    <!-- STEP 2 -->
+                                    <div class="relative cursor-pointer" @click="expandedNode = 2">
+                                        <div :class="expandedNode === 2 ? 'bg-cyan-500 border-cyan-400 ring-4 ring-cyan-950' : 'bg-slate-900 border-slate-700'" class="absolute -left-6 w-4 h-4 rounded-full border transition"></div>
+                                        <h4 class="text-xs font-semibold" :class="expandedNode === 2 ? 'text-cyan-400' : 'text-slate-400'">Step 2: Formally Notify Target</h4>
+                                    </div>
+
+                                    <!-- STEP 3 -->
+                                    <div class="relative cursor-pointer" @click="expandedNode = 3">
+                                        <div :class="expandedNode === 3 ? 'bg-cyan-500 border-cyan-400 ring-4 ring-cyan-950' : 'bg-slate-900 border-slate-700'" class="absolute -left-6 w-4 h-4 rounded-full border transition"></div>
+                                        <h4 class="text-xs font-semibold" :class="expandedNode === 3 ? 'text-cyan-400' : 'text-slate-400'">Step 3: External Regulatory Agency</h4>
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-900/80 p-3 rounded text-xs border border-slate-800/80 mt-2 text-slate-400">
+                                    <template x-if="expandedNode === 1"><span>Keep explicit timelines offline. Consolidate absolute timestamp entries on private physical vectors rather than corporate servers.</span></template>
+                                    <template x-if="expandedNode === 2"><span>Utilize our fact-focused draft text payload. Deliver with explicit transmission receipts via authenticated endpoints.</span></template>
+                                    <template x-if="expandedNode === 3"><span>File formal declarations with structural regional labor management entities using extracted violation items.</span></template>
+                                </div>
+                            </div>
+
+                            <!-- DRAFT & GAPS RESPONSE CONTAINER -->
+                            <div class="lg:col-span-2 space-y-4">
+                                <div class="glass-panel rounded-xl p-5 space-y-3">
+                                    <span class="block text-[10px] font-mono text-slate-500 uppercase">Objective Grievance Letter Draft</span>
+                                    <textarea readonly rows="10" x-text="escalateResult?.grievance_draft" class="w-full bg-slate-950/80 border border-slate-800 rounded p-3 text-xs font-mono text-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-800 select-all"></textarea>
+                                </div>
+
+                                <div class="glass-panel rounded-xl p-5 space-y-2">
+                                    <span class="block text-[10px] font-mono text-slate-500 uppercase">Prioritized Evidence Gap Analysis</span>
+                                    <ul class="list-disc pl-4 space-y-1 text-xs text-slate-400">
+                                        <template x-for="gap in escalateResult?.evidence_gap_analysis">
+                                            <li x-text="gap"></li>
+                                        </template>
+                                    </ul>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: POLICY DE-OBFUSCATOR -->
+                    <div x-show="activeTab === 'deobfuscate'" class="space-y-6">
+                        <div class="glass-panel rounded-xl p-6 space-y-4">
+                            <div>
+                                <h2 class="text-lg font-medium text-white">Corporate Policy De-Obfuscator</h2>
+                                <p class="text-sm text-slate-400">Deconstruct structural employee liability terms from handbook passages or non-disclosure pact segments.</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">Policy Segment / Handbook Text</label>
+                                <textarea x-model="policyText" rows="6" placeholder="Paste structural policy language paragraphs here for legal auditing exposure assessment..." class="w-full bg-slate-900/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 resize-none"></textarea>
+                            </div>
+
+                            <button @click="loadingMessage = 'De-obfuscating legal clause terms...'; triggerAction('/api/deobfuscate', { policy_text: policyText }, 'deobfuscateResult')" 
+                                    class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-slate-950 text-sm font-semibold py-2.5 rounded-lg transition shadow-md">
+                                Deconstruct Policy Liabilities
+                            </button>
+                        </div>
+
+                        <!-- DEOBFUSCATOR OUTPUT RESULTS -->
+                        <div x-show="deobfuscateResult" x-cloak class="glass-panel rounded-xl p-6 space-y-4">
+                            <div>
+                                <span class="block text-[10px] font-mono text-slate-500 uppercase">Simplified Plain Translation</span>
+                                <p class="text-sm text-slate-200 mt-1" x-text="deobfuscateResult?.plain_translation"></p>
+                            </div>
+                            <div class="border-t border-slate-800 pt-4">
+                                <span class="block text-[10px] font-mono text-red-400 uppercase">Uncovered Risk Factors & Catch Vectors</span>
+                                <ul class="list-disc pl-5 mt-2 space-y-1.5 text-xs text-slate-400">
+                                    <template x-for="loop in deobfuscateResult?.hidden_loops_or_risks">
+                                        <li x-text="loop" class="marker:text-red-500"></li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: TIMELINE GENERATOR -->
+                    <div x-show="activeTab === 'timeline'" class="space-y-6">
+                        <div class="glass-panel rounded-xl p-6 space-y-4">
+                            <div>
+                                <h2 class="text-lg font-medium text-white">Interactive Legal Timeline Generator</h2>
+                                <p class="text-sm text-slate-400">Convert long stream-of-consciousness logs into structured chronological case histories.</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2">Narrative Records Payload</label>
+                                <textarea x-model="narrative" rows="6" placeholder="Paste unorganized message trails, notes, or incident descriptions accompanied by raw date markers here..." class="w-full bg-slate-900/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-200 focus:outline-none focus:border-cyan-500 resize-none"></textarea>
+                            </div>
+
+                            <button @click="loadingMessage = 'Synthesizing verified case chronology timelines...'; triggerAction('/api/timeline', { narrative: narrative }, 'timelineResult')" 
+                                    class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-slate-950 text-sm font-semibold py-2.5 rounded-lg transition shadow-md">
+                                Build Case Chronology
+                            </button>
+                        </div>
+
+                        <!-- TIMELINE RESPONSE DATA RENDERER -->
+                        <div x-show="timelineResult" x-cloak class="glass-panel rounded-xl p-6 space-y-6">
+                            <span class="block text-[10px] font-mono text-slate-500 uppercase tracking-wider">Chronological Case Log Summary</span>
+                            
+                            <div class="relative pl-6 space-y-6 before:absolute before:bottom-2 before:top-2 before:left-2 before:w-0.5 before:bg-slate-800">
+                                <template x-for="evt in timelineResult?.timeline">
+                                    <div class="relative">
+                                        <div class="absolute -left-6 w-4 h-4 rounded-full border border-cyan-500 bg-slate-950 flex items-center justify-center text-[8px] font-mono text-cyan-400">✓</div>
+                                        <div class="bg-slate-900/40 border border-slate-800/80 rounded-lg p-3 space-y-1">
+                                            <span class="inline-block text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-900/60 px-2 py-0.5 rounded" x-text="evt.date"></span>
+                                            <h4 class="text-sm font-semibold text-white mt-1" x-text="evt.incident"></h4>
+                                            <p class="text-xs text-slate-400" x-text="evt.details"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </main>
+    </div>
+
+</body>
+</html>
